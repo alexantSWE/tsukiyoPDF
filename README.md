@@ -7,13 +7,13 @@ As I'm an utter noob, I'll start with the very basics and slowly crawl (yes, cra
 why, you may ask? . not that there is anything inherntly wrong with dependencies , it's just the "reliance" factor
 I don't want the project to be reliant on too many thing, also I want to challenge myself by creating a new piece of software 
 # basics
-open and close PDF files,properly (duh)
-Hardware acceleration(we like the word "smooth")
-no generic wayland logo, please
+* open and close PDF files,properly (duh)
+* Hardware acceleration(we like the word "smooth")
+* no generic wayland logo, please
 
 # advanced
-annotation, highlighting and stuff
-tabbed interface
+* annotation, highlighting, editing and stuff
+* tabbed interface
 
 # want to contribute?
 you know the drill :)
