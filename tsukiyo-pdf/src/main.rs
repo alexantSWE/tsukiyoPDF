@@ -1,6 +1,7 @@
 use lopdf::Document;
 use log::{info, error};
 use std::fs;
+use fltk::{app, button::Button, frame::Frame, prelude::*, window::Window};
 
 fn main() {
     // Initialize logger

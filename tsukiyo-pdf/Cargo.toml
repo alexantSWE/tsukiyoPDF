@@ -7,3 +7,5 @@ edition = "2024"
 lopdf = "0.36.0"
 log = "0.4"
 env_logger = "0.11.7"
+fltk = { version = "1.5.5", features = ["fltk-bundled"] }
+pdfium-render =  "0.8.29"
