@@ -1,31 +1,48 @@
-# tsukiyoPDF
-super fast, Rust(btw) PDF reader with "Dark Mode" support or at least, that's the goal :)
+🌙 tsukiyoPDF
 
-# inspiration 
-getting to know Rust from a hands-on approach (since Rust is a really solid language and also all the craze recently, specially in the Linux space)
+🚀 A super fast, Rust-based PDF reader with Dark Mode support (or at least, that's the goal! 😉)
+🤔 What’s with the name?
 
-I really liked NightPDF project and was hoping to do something remotely similar(although this and NightPDF are too vastly different) ,
-I would like to, if possible, do it without the help of Electron or Tauri
+The name comes from the Japanese word 月夜 (Tsukiyo), which literally means "moon night" 🌙 or more poetically, "moonlit night" ✨.
+💡 Inspiration
 
-As I'm an utter noob, I'll start with the very basics and slowly crawl my way up to more "advanced" stuff.
-**this project will probably stay as "educational", for a long long while**
-# basic features
-* open and close PDF files,properly (duh)
-* Hardware acceleration(we like the word "smooth")
-* I know that hardware acceleration isn't exactly a basic thing, but it's very important to me
-* no generic wayland logo, please(future me)
+Getting to know Rust through a hands-on approach 🦀 (it's a solid language, and it's all the rage recently, especially in the Linux space 🐧).
+I was inspired by the NightPDF project and wanted to try something similar, though this project and NightPDF are very different!
+My goal is to avoid using Electron or Tauri if possible 💻🚫.
 
-# advanced
-* annotation, highlighting, basic editing 
-* tabbed interface
+As a complete noob 🍼, I’m starting with the basics and slowly working my way up to more advanced stuff.
+Disclaimer: This project will probably stay in "educational" mode for a long time ⏳.
 
-# want to contribute?
-this project is still in it's infancy and it's future is very uncertain
-you know the drill :)
-create PRs, open issues and get involved 
-(later on, I would implement a proper template for reporting issues
+🛠️ Basic Features
 
-# license
-MIT
+    📂 Open and close PDF files, properly (duh!)
 
+    ⚡ Hardware acceleration (because we love that smooth experience!)
 
+    🖥️ Hardware acceleration might not be basic, but it’s important to me!
+
+    🚫 No generic Wayland logo, please (future me will thank me)
+    
+
+🚀 Advanced Features
+
+    ✏️ Annotations, highlighting, and basic editing
+
+    🗂️ Tabbed interface
+
+🤝 Want to Contribute?
+
+This project is still in its infancy 🐣, and the future is uncertain 🔮.
+You know the drill:
+
+    Create PRs 🧑‍💻
+
+    Open issues 💬
+
+    Get involved! 🙌
+
+Later on, I’ll implement a proper template for reporting issues 📑.
+
+📜 License
+
+MIT License 📝
