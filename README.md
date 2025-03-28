@@ -3,8 +3,9 @@ super fast, Rust(btw) PDF reader with "Dark Mode" support or at least, that's th
 
 # inspiration 
 getting to know Rust from a hands-on approach (since Rust is a really solid language and also all the craze recently, specially in the Linux space)
-I really liked NightPDF project and was hoping to do something remotely similar , if possible, without the help of Electron or Tauri
-I still don't know about the UI framework that I'll be choosing, so, at first I would like to have a working CLI
+
+I really liked NightPDF project and was hoping to do something remotely similar(although this and NightPDF are too vastly different) ,
+I would like to, if possible, do it without the help of Electron or Tauri
 
 As I'm an utter noob, I'll start with the very basics and slowly crawl my way up to more "advanced" stuff.
 **this project will probably stay as "educational", for a long long while**
