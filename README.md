@@ -20,6 +20,7 @@ As I'm an utter noob, I'll start with the very basics and slowly crawl my way up
 * tabbed interface
 
 # want to contribute?
+this project is still in it's infancy and it's future is very uncertain
 you know the drill :)
 create PRs, open issues and get involved 
 (later on, I would implement a proper template for reporting issues
