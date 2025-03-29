@@ -9,7 +9,7 @@ mod window;
 fn main() {
     // Initialize logger
     env_logger::init();
-    window::create_window();
+    window::create_window("/home/el/Downloads/sample-4.pdf");
 
     let file_path = "/home/el/Downloads/sample-4.pdf";
 
