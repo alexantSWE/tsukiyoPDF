@@ -3,9 +3,13 @@ use log::{info, error};
 use std::fs;
 use fltk::{app, button::Button, frame::Frame, prelude::*, window::Window};
 
+mod window;
+
+
 fn main() {
     // Initialize logger
     env_logger::init();
+    window::create_window();
 
     let file_path = "/home/el/Downloads/sample-4.pdf";
 
