@@ -2,7 +2,7 @@ use fltk::{app, image::RgbImage, prelude::*, window::Window, frame::Frame};
 use pdfium_render::prelude::*;
 use log::info;
 use std::path::Path;
-
+//comment
 pub fn create_window(pdf_path: &str) {
     let app = app::App::default();
     let mut wind = Window::new(100, 100, 800, 600, "PDF Viewer");
