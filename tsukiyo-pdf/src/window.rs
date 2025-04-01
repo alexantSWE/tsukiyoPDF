@@ -55,7 +55,7 @@ fn render_pdf_page_to_image(pdf_path: &str, page_number: usize) -> Option<RgbIma
     RgbImage::new(
         bytes.as_slice(),          // Convert Vec<u8> to &[u8]
         height,                    // Image height
-        image::ColorType::Rgba8,    // Correct color type
+        width,    // Correct color type
         ColorDepth::Rgba8,                // Add the required ColorDepth argument
     ).ok()
     
@@ -68,7 +68,7 @@ fn render_pdf_page_to_image(pdf_path: &str, page_number: usize) -> Option<RgbIma
 fn main() {
     let pdf_path = "example.pdf";
     let page_number = 0;
-    let width = 800; // Change based on your PDF rendering output
+    let width = 800;
     let height = 600;
 
     match render_pdf_page_to_image(pdf_path, page_number) {
