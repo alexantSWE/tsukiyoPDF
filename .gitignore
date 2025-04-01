@@ -1,2 +1,4 @@
 tsukiyo-pdf/target/*
 *.rs.bk
+tsukiyo-pdf/Cargo.lock
+.qodo/history.sqlite
