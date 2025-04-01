@@ -1,9 +1,8 @@
 use lopdf::Document;
 use log::{info, error};
 use std::fs;
-use fltk::{app, button::Button, frame::Frame, prelude::*, window::Window};
 
-mod window;
+pub mod window;
 // idk
 
 fn main() {
