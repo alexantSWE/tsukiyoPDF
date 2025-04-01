@@ -1,7 +1,6 @@
-use image::{ImageBuffer, Rgb}; // Correct ImageBuffer import
-use fltk::{app, enums::ColorDepth, frame::Frame, image::{self, RgbImage}, prelude::*, window::Window};
+use image::{ImageBuffer, Rgb};
+use fltk::{app, enums::ColorDepth, frame::Frame, image::RgbImage as FltkRgbImage, prelude::{GroupExt, ImageExt, WidgetBase, WidgetExt}, window::Window};
 use pdfium_render::prelude::*;
-use log::info;
 use std::path::Path;
 //mod
 pub fn create_window(pdf_path: &str) {
@@ -24,9 +23,9 @@ pub fn create_window(pdf_path: &str) {
 
 
 
-fn render_pdf_page_to_image(pdf_path: &str, page_number: usize) -> Option<RgbImage> {
+fn render_pdf_page_to_image(pdf_path: &str, page_number: usize) -> Option<FltkRgbImage> {
     // Convert `usize` to `u16` safely
-    let page_number: u16 = page_number.try_into().ok()?; 
+    let page_number: u16 = page_number.try_into().ok()?;  
 
     // Initialize Pdfium
     let pdfium = Pdfium::new(Pdfium::bind_to_system_library().ok()?);
@@ -43,27 +42,25 @@ fn render_pdf_page_to_image(pdf_path: &str, page_number: usize) -> Option<RgbIma
         .set_target_height(600);
 
     // Render the page
-    let bitmap = page.render_with_config(&config).ok()?; //Now `page` is a `PdfPage`
+    let bitmap = page.render_with_config(&config).ok()?; // Now `bitmap` is a `PdfBitmap`
 
-    let (width, height) = (bitmap.width() as u32, bitmap.height() as u32);
-    let bytes = bitmap.as_rgba_bytes(); // Get RGB byte slice
+    let (width, height) = (bitmap.width() as i32, bitmap.height() as i32);
+    let bytes = bitmap.as_rgba_bytes(); // Get RGBA byte slice
 
-    // Convert raw bytes to an `RgbImage`
-    let width: i32 = width as i32;
-    let height: i32 = height as i32;
+    // Convert raw bytes to an `FltkRgbImage`
+    let rgb_image = FltkRgbImage::new(
+        bytes.as_slice(),  // Convert Vec<u8> to &[u8]
+        width,             // Image width
+        height,            // Image height
+        ColorDepth::Rgba8, // Specify RGBA format
+    ).ok(); // <- THIS ENSURES `Option<FltkRgbImage>` IS RETURNED 
 
-    RgbImage::new(
-        bytes.as_slice(),          // Convert Vec<u8> to &[u8]
-        height,                    // Image height
-        width,    // Correct color type
-        ColorDepth::Rgba8,                // Add the required ColorDepth argument
-    ).ok()
-    
+    }
 
+ /*
+Convert to Vec<u8> for ownership
+*/
 
-
- // Convert to Vec<u8> for ownership
-}
 
 fn main() {
     let pdf_path = "example.pdf";
@@ -72,13 +69,13 @@ fn main() {
     let height = 600;
 
     match render_pdf_page_to_image(pdf_path, page_number) {
-        Some(raw_pixels) => {
-            let img_buffer = ImageBuffer::<fltk::dialog::ColorMode, Vec<u8>>::from_raw(width, height, raw_pixels)
-                .expect("Failed to create ImageBuffer");
-
-            img_buffer.save("output.png").expect("Failed to save image");
+        Some(fltk_img) => {
+            let raw_pixels = fltk_img.to_rgb_data();
+            let img = ImageBuffer::<Rgb<u8>, Vec<u8>>::from_raw(width, height, raw_pixels)
+                .expect("Failed to create image buffer");
+    
+            img.save("output.png").expect("Failed to save image");
         }
         None => eprintln!("Failed to render PDF page"),
-    }
+    } // Corrected the trailing comma
 }
-
