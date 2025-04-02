@@ -1,0 +1,36 @@
+// --- Optional: Code for saving the first page as PNG (from original code, slightly improved) ---
+    /*
+    // Add 'use image::{ImageBuffer, Rgb};' back at the top if using this.
+    let page_number = 0;
+    println!("Attempting to render PDF page {} to image...", page_number);
+    match render_pdf_page_to_image(pdf_path, page_number) {
+        Some(fltk_img) => {
+            println!("Rendering successful. Saving to output.png...");
+            // Get dimensions directly from the FLTK image
+            let w = fltk_img.data_w();
+            let h = fltk_img.data_h();
+            // Get RGB data (might discard alpha, might fail if format mismatch)
+            let rgb_pixels = fltk_img.to_rgb_data();
+
+            // Check if data length matches expected RGB (3 bytes/pixel)
+            if rgb_pixels.len() == (w * h * 3) as usize {
+                // Create an ImageBuffer assuming RGB data
+                match ImageBuffer::<Rgb<u8>, Vec<u8>>::from_raw(w as u32, h as u32, rgb_pixels) {
+                    Some(img) => {
+                        // Save the image as a PNG file
+                        match img.save("output.png") {
+                            Ok(_) => println!("Image saved successfully to output.png"),
+                            Err(e) => eprintln!("Error saving image: {}", e),
+                        }
+                    }
+                    None => eprintln!("Error: Failed to create image buffer from raw RGB data."),
+                }
+            } else {
+                 eprintln!("Error: Pixel data length ({}) does not match expected RGB size ({}x{}x3={}). Might be RGBA or format issue.",
+                    rgb_pixels.len(), w, h, w * h * 3);
+                 // If you need RGBA, you might need `fltk_img.data()` and use `ImageBuffer<Rgba<u8>, _>`
+            }
+        }
+        None => eprintln!("Error: Failed to render PDF page for saving."),
+    }
+    */

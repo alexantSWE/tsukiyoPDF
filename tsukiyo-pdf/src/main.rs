@@ -1,152 +1,449 @@
 use fltk::{
     app,
-    enums::ColorDepth,
+    enums::{ColorDepth, Event, Key},
     frame::Frame,
     image::RgbImage as FltkRgbImage,
-    prelude::{GroupExt, WidgetBase, WidgetExt},
+    prelude::*,
     window::Window,
 };
 use pdfium_render::prelude::*;
-use std::path::Path;
-// NOTE: Removed 'image' crate import as it's not used in the GUI part.
-//       Add it back if you uncomment the saving logic in main.
+use std::{
+    cell::RefCell,
+    path::{Path, PathBuf},
+    rc::Rc,
+    // No longer need OnceLock for Pdfium itself
+};
 
-// Function to create and run the FLTK window
-pub fn create_window(pdf_path: &str) {
-    let app = app::App::default();
-    let mut wind = Window::new(100, 100, 800, 600, "PDF Viewer");
-
-    // Create a frame that will hold the rendered PDF page image
-    let mut frame = Frame::new(0, 0, 800, 600, "");
-
-    // Attempt to render the first page (index 0) of the PDF
-    match render_pdf_page_to_image(pdf_path, 0) {
-        Some(image) => {
-            // If rendering is successful, set the image to the frame
-            // Note: FltkRgbImage's internal data might need scaling if its
-            // dimensions don't match the frame. Frame usually scales automatically.
-            frame.set_image(Some(image));
-            // Redraw the frame to display the image
-            frame.redraw();
-        }
-        None => {
-            // If rendering fails, print an error message to stderr
-            eprintln!("Error: Failed to render PDF page.");
-            // Optionally display an error message in the frame itself
-            frame.set_label("Failed to load PDF page.");
-        }
-    }
-
-    wind.end(); // End adding widgets to the window
-    wind.show(); // Make the window visible
-    app.run().unwrap(); // Start the FLTK event loop
+// --- Application State ---
+// Add a lifetime parameter 'a tied to the Pdfium instance
+struct AppState<'a> { // <--- Added lifetime 'a
+    pdf_path: PathBuf,
+    doc: PdfDocument<'a>, // <--- Doc now borrows from Pdfium instance with lifetime 'a
+    current_page: u16,
+    total_pages: u16,
+    frame: Frame,
 }
 
-// Function to render a specific page of a PDF to an FLTK image
-fn render_pdf_page_to_image(pdf_path: &str, page_number: usize) -> Option<FltkRgbImage> {
-    // Convert page number from usize to u16, return None on failure (e.g., overflow)
-    let page_number_u16: u16 = page_number.try_into().ok()?;
-
-    // Initialize the Pdfium library bindings. Return None if binding fails.
-    // This assumes the Pdfium library is available on the system.
-    let pdfium = Pdfium::new(Pdfium::bind_to_system_library().ok()?);
-
-    // Load the PDF document from the given path. Return None on failure.
-    let doc = pdfium.load_pdf_from_file(Path::new(pdf_path), None).ok()?;
-
-    // Get the specific page from the document. Return None if the page number is invalid.
-    let page = doc.pages().get(page_number_u16).ok()?; // Get page as Result, convert to Option, propagate None
-
-    // Configure the rendering options. Here, we aim for a specific size.
-    // Aspect ratio might not be preserved if target dimensions differ from page ratio.
-    let render_config = PdfRenderConfig::new()
-        .set_target_width(800) // Target width for rendering
-        .set_target_height(600); // Target height for rendering
-        // Add .force_halftone(true) if rendering quality is poor on some viewers
-        // Add .render_for_printing(true) for potentially higher quality rendering
-        // Consider set_clear_white(true) or background color if needed
-
-    // Render the page to a bitmap with the specified configuration. Return None on failure.
-    let bitmap = page.render_with_config(&render_config).ok()?;
-
-    // Get the dimensions (width and height) of the rendered bitmap.
-    let width = bitmap.width() as i32; // Cast to i32 for FLTK
-    let height = bitmap.height() as i32; // Cast to i32 for FLTK
-
-    // Get the pixel data as a slice of bytes (Option<&[u8]>).
-    // Assumes RGBA format based on ColorDepth::Rgba8 used below.
-    // Pdfium might produce BGRA, check color output!
-    let bytes = bitmap.as_rgba_bytes(); // Propagate None if conversion fails
-
-    // Create an FltkRgbImage from the raw pixel data.
-    // FltkRgbImage::new copies the data, so the 'bytes' slice doesn't need to outlive this function.
-    // We specify Rgba8 (4 bytes per pixel). Check if colors are swapped (BGRA issue).
-          
-// Create an FltkRgbImage from the raw pixel data.
-    // FltkRgbImage::new copies the data from the slice.
-    let fltk_image = FltkRgbImage::new(
-        &bytes,            // Pass a slice &[u8] of the Vec<u8>
-        width,             // Image width
-        height,            // Image height
-        ColorDepth::Rgba8, // Specify RGBA format
-    )
-    .ok()?; // Convert Result<FltkRgbImage, FltkError> to Option<FltkRgbImage>
-
-    
-
-    Some(fltk_image) // Return the created FLTK image wrapped in Some
-} // Added missing closing brace
-
-// Main function - entry point of the application
-fn main() {
-    // Define the path to the PDF file
-    // Make sure this file exists relative to where you run the executable!
-    let pdf_path = "/home/el/Downloads/sample-3.pdf";
-
-    // Check if the path exists before trying to create the window
-    if !Path::new(pdf_path).exists() {
-         eprintln!("Error: PDF file not found at '{}'", pdf_path);
-         return;
+// --- Rendering Logic ---
+// Function signature now requires the lifetime 'a for AppState
+fn render_and_update_frame<'a>(state: &mut AppState<'a>, frame_w: i32, frame_h: i32) {
+    if frame_w <= 0 || frame_h <= 0 {
+        println!("Skipping render for zero/negative frame size");
+        // Optionally clear the frame or show a placeholder
+        state.frame.set_image::<FltkRgbImage>(None); // Clear previous image
+        state.frame.set_label("Resize window");
+        state.frame.redraw();
+        return;
     }
 
-    println!("Starting PDF viewer for: {}", pdf_path);
-    // Call the function to create and display the window
-    create_window(pdf_path);
+    // Get the page (handle potential errors)
+    let page_result = state.doc.pages().get(state.current_page);
+    let page = match page_result {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!(
+                "Error getting page index {}: {:?}", // 0-based index for error msg
+                state.current_page,
+                e
+            );
+            state.frame.set_label(&format!("Error loading page {}", state.current_page + 1));
+            state.frame.redraw();
+            return;
+        }
+    };
 
-    // --- Optional: Code for saving the first page as PNG (from original code, slightly improved) ---
-    /*
-    // Add 'use image::{ImageBuffer, Rgb};' back at the top if using this.
-    let page_number = 0;
-    println!("Attempting to render PDF page {} to image...", page_number);
-    match render_pdf_page_to_image(pdf_path, page_number) {
-        Some(fltk_img) => {
-            println!("Rendering successful. Saving to output.png...");
-            // Get dimensions directly from the FLTK image
-            let w = fltk_img.data_w();
-            let h = fltk_img.data_h();
-            // Get RGB data (might discard alpha, might fail if format mismatch)
-            let rgb_pixels = fltk_img.to_rgb_data();
+    fn render_and_update_frame<'a>(state: &mut AppState<'a>, frame_w: i32, frame_h: i32) {
+        // ... (previous checks for frame_w, frame_h) ...
+        // ... (getting the page) ...
+    
+        // --- Get Page Dimensions CORRECTLY ---
+        let page_w_result = page.width();
+        let page_h_result = page.height();
+    
+        // Handle potential errors when getting dimensions
+        let page_w_points = match page_w_result {
+            Ok(w) => w, // Corrected: Assign w directly if Ok
+            Err(e) => {
+                // Corrected: Provide page number (user-friendly) and the error e
+                eprintln!(
+                    "Error getting page width for page {}: {:?}",
+                    state.current_page + 1, // User-friendly 1-based index
+                    e
+                );
+                // Corrected: Use correct syntax for set_label
+                state.frame.set_label("Error: Page Width");
+                state.frame.redraw();
+                return; // Return early on error
+            }
+        }; // Semicolon needed here for the let binding
+    
+        let page_h_points = match page_h_result {
+            Ok(h) => h, // Corrected: Assign h directly if Ok
+            Err(e) => {
+                // Corrected: Provide page number (user-friendly) and the error e
+                eprintln!(
+                    "Error getting page height for page {}: {:?}",
+                    state.current_page + 1, // User-friendly 1-based index
+                    e
+                );
+                // Corrected: Use correct syntax for set_label
+                state.frame.set_label("Error: Page Height");
+                state.frame.redraw();
+                return; // Return early on error
+            }
+        }; // Semicolon needed here for the let binding
+    
+        // Extract f32 values from PdfPoints using .into()
+        let page_w: f32 = page_w_points.into();
+        let page_h: f32 = page_h_points.into();
 
-            // Check if data length matches expected RGB (3 bytes/pixel)
-            if rgb_pixels.len() == (w * h * 3) as usize {
-                // Create an ImageBuffer assuming RGB data
-                match ImageBuffer::<Rgb<u8>, Vec<u8>>::from_raw(w as u32, h as u32, rgb_pixels) {
-                    Some(img) => {
-                        // Save the image as a PNG file
-                        match img.save("output.png") {
-                            Ok(_) => println!("Image saved successfully to output.png"),
-                            Err(e) => eprintln!("Error saving image: {}", e),
+    // Check for zero/negative dimensions *after* getting them
+    if page_w <= 0.0 || page_h <= 0.0 {
+        eprintln!("Skipping render for zero/negative page size (w={}, h={})", page_w, page_h);
+        state.frame.set_label("Invalid page dimensions");
+        state.frame.redraw();
+        return;
+    }
+    // --- End of Dimension Fixes ---
+
+
+    // --- Aspect Ratio Calculation (uses page_w, page_h as f32) ---
+    let frame_w_f = frame_w as f32;
+    let frame_h_f = frame_h as f32;
+
+    // Calculate scaling factors
+    let scale_w = frame_w_f / page_w;
+    let scale_h = frame_h_f / page_h;
+    // Use the smaller scale factor to fit without distortion
+    let scale = scale_w.min(scale_h);
+
+    // Calculate target render dimensions (in pixels)
+    // Ensure dimensions are at least 1 pixel if scaling results in zero
+    let render_w = ((page_w * scale).round() as u16).max(1);
+    let render_h = ((page_h * scale).round() as u16).max(1);
+
+    // Configure rendering for the calculated size
+    let render_config = PdfRenderConfig::new()
+        .set_target_width(render_w)
+        .set_target_height(render_h)
+        // Generally, Pdfium's default rasterizer provides good anti-aliasing
+        // when rendering to the target resolution.
+        // You usually don't need explicit AA flags unless troubleshooting.
+        ;
+
+    // Render the page
+    match page.render_with_config(&render_config) {
+        Ok(bitmap) => { // <--- Inside this block, 'bitmap' IS of type PdfBitmap
+
+             // 1. Get the Result for width
+             let width_result = bitmap.width(); // Assuming this returns Result<PdfPoints, ...>
+
+             // 2. Match the Result for width
+             let width_points = match width_result {
+                 Ok(w) => w, // Extract PdfPoints if Ok
+                 Err(e) => {
+                     eprintln!("Error getting bitmap width after rendering page {}: {:?}", state.current_page + 1, e);
+                     state.frame.set_label("Error: Bitmap Width");
+                     state.frame.redraw();
+                     return; // Return early
+                 }
+             };
+ 
+             // 3. Get the Result for height
+             let height_result = bitmap.height(); // Assuming this returns Result<PdfPoints, ...>
+ 
+             // 4. Match the Result for height
+             let height_points = match height_result {
+                 Ok(h) => h, // Extract PdfPoints if Ok
+                 Err(e) => {
+                     eprintln!("Error getting bitmap height after rendering page {}: {:?}", state.current_page + 1, e);
+                     state.frame.set_label("Error: Bitmap Height");
+                     state.frame.redraw();
+                     return; // Return early
+                 }
+             };
+ 
+             // 5. Convert PdfPoints to f32
+             let width_f32: f32 = width_points.into();
+             let height_f32: f32 = height_points.into();
+ 
+             // 6. Convert f32 to i32 for FltkRgbImage (rounding is usually best)
+             let width: i32 = width_f32.round() as i32;
+             let height: i32 = height_f32.round() as i32;
+             // --- End of Bitmap Dimension Handling ---
+ 
+ 
+             // Ensure dimensions are positive after potential rounding
+              if width <= 0 || height <= 0 {
+                  eprintln!("Bitmap dimension is zero or negative after conversion (w={}, h={})", width, height);
+                  state.frame.set_label("Render Error (Conv Size)");
+                  state.frame.redraw();
+                  return;
+              }
+ 
+             // Get pixel data (into_rgba_bytes consumes bitmap)
+             // NOTE: If bitmap.width/height really return Result<PdfPoints>,
+             // calling bitmap.into_rgba_bytes() *after* might be problematic if
+             // into_rgba_bytes depends on width/height internally without re-checking.
+             // This API seems increasingly strange if this is the case.
+             let bytes = bitmap.into_rgba_bytes();
+ 
+              if bytes.is_empty() {
+                  eprintln!("Rendered bitmap has empty pixel data.");
+                  state.frame.set_label("Render Error (Empty)");
+                  state.frame.redraw();
+                  return;
+              }
+ 
+              // Create FLTK image using the final i32 width/height
+             match FltkRgbImage::new(&bytes, width, height, ColorDepth::Rgba8) {
+                 Ok(fltk_image) => {
+                     state.frame.set_image(Some(fltk_image));
+                     state.frame.set_label("");
+                 }
+                 Err(e) => {
+                     eprintln!("Error creating FLTK image: {:?}", e);
+                     state.frame.set_label("FLTK Image Error");
+                 }
+             }
+         }
+         Err(e) => {
+             eprintln!(
+                 "Error rendering page {} with config {:?}: {:?}",
+                 state.current_page + 1,
+                 render_config,
+                 e
+             );
+             state.frame.set_label("PDF Render Error");
+         }
+     }
+     // Crucial: Redraw the frame after attempting to set the image or label
+     state.frame.redraw();
+    }
+
+
+// --- Main Window Creation ---
+pub fn create_window(pdf_path_str: &str) {
+    let pdf_path = PathBuf::from(pdf_path_str);
+    if !pdf_path.exists() {
+        eprintln!("Error: PDF file not found at '{}'", pdf_path_str);
+        // Use FLTK dialog for user feedback if possible before exiting
+        let _ = fltk::dialog::alert_default(&format!("Error: PDF file not found at\n{}", pdf_path_str));
+        return;
+    }
+
+    // --- Initialize Pdfium Here ---
+    // Pdfium instance lives for the duration of `create_window`
+    let pdfium = match Pdfium::bind_to_system_library() {
+         Ok(bindings) => Pdfium::new(bindings),
+         Err(e) => {
+             eprintln!("FATAL: Failed to bind to Pdfium system library: {:?}", e);
+             eprintln!("Please ensure the Pdfium library is installed and accessible.");
+             let _ = fltk::dialog::alert_default(&format!("Failed to initialize PDF engine: {:?}\nPlease ensure Pdfium library is installed.", e));
+             return;
+         }
+    }; // pdfium instance created here
+
+    // --- Load the document using the local Pdfium instance ---
+    // The resulting 'doc' borrows from 'pdfium'
+    let doc = match pdfium.load_pdf_from_file(&pdf_path, None) {
+        Ok(d) => d, // 'd' has lifetime tied to 'pdfium'
+        Err(e) => {
+            eprintln!("Error loading PDF '{}': {:?}", pdf_path_str, e);
+            let _ = fltk::dialog::alert_default(&format!("Failed to load PDF:\n{}\nError: {}", pdf_path.display(), e));
+            return;
+        }
+    }; // 'doc' created here
+
+    // --- Get Page Count ---
+    let total_pages = match doc.pages().len() {
+         Ok(len) if len > 0 => len, // Proceed only if pages exist
+         Ok(_) => { // len == 0
+             println!("PDF has no pages.");
+             let _ = fltk::dialog::alert_default("The selected PDF file contains no pages.");
+             return;
+         },
+        Err(e) => {
+             eprintln!("Error getting page count: {:?}", e);
+             let _ = fltk::dialog::alert_default(&format!("Failed get page count: {}", e));
+             return;
+        }
+    };
+
+
+    let app = app::App::default().with_scheme(app::Scheme::Gtk); // Or try Gleam/Plastic
+    let mut wind = Window::new(100, 100, 800, 600, "Tsukiyo PDF Viewer"); // Initial size
+
+    // Frame starts filling the window
+    let mut frame = Frame::new(0, 0, wind.w(), wind.h(), "");
+    frame.set_frame(fltk::enums::FrameType::NoBox); // Avoid frame drawing over image edge
+    wind.end();
+
+    // Make the window resizable, with the frame being the resizable element
+    wind.make_resizable(true);
+    wind.resizable(&frame); // The frame will be resized by the window manager
+
+    // --- State Management ---
+    // Create AppState. 'doc' is moved in. The state now borrows from 'pdfium'
+    // via the 'doc' field, implicitly getting the lifetime 'a.
+    let app_state = Rc::new(RefCell::new(AppState { // Lifetime 'a is inferred here
+        pdf_path,
+        doc, // Move the document into the state
+        current_page: 0, // Start at first page (0-based index)
+        total_pages,
+        frame, // Move the frame widget into the state
+    }));
+
+    // --- Initial Render ---
+    { // Create a scope to borrow mutably then release immediately
+        let mut state_mut = app_state.borrow_mut();
+        let initial_w = state_mut.frame.w();
+        let initial_h = state_mut.frame.h();
+        // Perform initial render
+        render_and_update_frame(&mut state_mut, initial_w, initial_h);
+        // Update window title initially
+        wind.set_label(&format!("Page {}/{} - Tsukiyo PDF Viewer", state_mut.current_page + 1, state_mut.total_pages));
+    } // state_mut borrow ends here
+
+
+    // --- Resize Callback ---
+    // Attached to the window, triggered when the window size changes
+    let state_for_resize = app_state.clone();
+    wind.set_callback(move |w| { // 'w' is the window widget
+        // When the window resizes, the 'frame' inside our state should have been resized too
+        // because we set `wind.resizable(&frame)`
+        let mut state = state_for_resize.borrow_mut();
+        let frame_w = state.frame.w(); // Get the *new* size of the frame
+        let frame_h = state.frame.h();
+
+        // Render only if the size is valid
+        if frame_w > 0 && frame_h > 0 {
+             // println!("Window resized, rendering for frame size: {}x{}", frame_w, frame_h); // Debug
+             render_and_update_frame(&mut state, frame_w, frame_h);
+        } else {
+            // This might happen if the window is minimized or has an invalid size reported
+            println!("Window resize resulted in zero frame dimension, skipping render.");
+            state.frame.set_image::<FltkRgbImage>(None); // Clear image
+            state.frame.set_label("Invalid size");
+            state.frame.redraw();
+        }
+        // We don't need app::redraw() usually, the render function redraws the frame.
+    });
+
+
+    // --- Keypress Handler ---
+    // Attached to the window to capture key events globally for the app
+    let state_for_keys = app_state.clone();
+    // Need access to window to update title
+    let mut wind_clone = wind.clone();
+    wind.handle(move |_, ev| { // Widget arg is the window ('_'), ev is the event
+        match ev {
+            Event::KeyDown => {
+                let mut state = state_for_keys.borrow_mut(); // Mutable access to state
+                let mut page_changed = false;
+                let current_page = state.current_page; // Copy to avoid borrow conflicts
+                let total_pages = state.total_pages;
+
+                match app::event_key() {
+                    // Navigation Keys
+                    Key::PageDown | Key::Right | Key::Down => {
+                        if current_page < total_pages.saturating_sub(1) {
+                            state.current_page += 1;
+                            page_changed = true;
+                        } else {
+                             println!("Already on last page ({})", total_pages); // Info
+                             // Optionally flash background or something?
+                             return true; // Consume event even if no change
                         }
                     }
-                    None => eprintln!("Error: Failed to create image buffer from raw RGB data."),
+                    Key::PageUp | Key::Left | Key::Up => {
+                        if current_page > 0 {
+                            state.current_page -= 1;
+                            page_changed = true;
+                        } else {
+                             println!("Already on first page (1)"); // Info
+                             return true; // Consume event
+                        }
+                    }
+                    // Go to Start/End
+                    Key::Home => {
+                         if current_page != 0 {
+                              state.current_page = 0;
+                              page_changed = true;
+                         } else {
+                              return true; // Consume event
+                         }
+                    }
+                    Key::End => {
+                         let last_page = total_pages.saturating_sub(1);
+                         if current_page != last_page {
+                              state.current_page = last_page;
+                              page_changed = true;
+                         } else {
+                              return true; // Consume event
+                         }
+                    }
+                    // Add more keybinds here if needed (e.g., zoom, search)
+
+                    _ => return false, // Key not handled by us, let FLTK process (e.g., Alt+F4)
                 }
-            } else {
-                 eprintln!("Error: Pixel data length ({}) does not match expected RGB size ({}x{}x3={}). Might be RGBA or format issue.",
-                    rgb_pixels.len(), w, h, w * h * 3);
-                 // If you need RGBA, you might need `fltk_img.data()` and use `ImageBuffer<Rgba<u8>, _>`
+
+                // If the page changed, re-render and update title
+                if page_changed {
+                    println!("Navigating to Page {}", state.current_page + 1); // User feedback
+                    let frame_w = state.frame.w(); // Get current frame size
+                    let frame_h = state.frame.h();
+                     // Render only if frame size is valid
+                     if frame_w > 0 && frame_h > 0 {
+                         render_and_update_frame(&mut state, frame_w, frame_h);
+                         // Update window title
+                         wind_clone.set_label(&format!("Page {}/{} - Tsukiyo PDF Viewer", state.current_page + 1, state.total_pages));
+                     } else {
+                         println!("Frame size invalid after page change, skipping render.");
+                         // Still update the page number logic, but don't render visually
+                          state.frame.set_image::<FltkRgbImage>(None);
+                          state.frame.set_label("Invalid size");
+                          state.frame.redraw();
+                     }
+                    return true; // Event was handled
+                } else {
+                     // This branch might not be reached if we return true above,
+                     // but keep for clarity if logic changes.
+                     return false;
+                }
             }
+            _ => false, // Event type not handled (e.g., MouseMove, Focus)
         }
-        None => eprintln!("Error: Failed to render PDF page for saving."),
-    }
-    */
+    });
+
+    // Show the window
+    wind.show();
+
+    // --- Event Loop ---
+    // IMPORTANT: 'pdfium' and 'doc' (inside app_state) must live until app.run() finishes.
+    // Since they are created in this function scope, and app.run() blocks here,
+    // they will live long enough.
+    app.run().unwrap();
+
+    // 'app_state', 'doc' (within app_state), and 'pdfium' are dropped here after app.run() returns.
+
+} // <-- pdfium instance is dropped here, AppState goes out of scope
+
+// --- Main Function ---
+fn main() {
+    // Define the path to the PDF file
+    // Consider using command-line arguments for flexibility:
+    let args: Vec<String> = std::env::args().collect();
+    let pdf_path = if args.len() > 1 {
+        &args[1]
+    } else {
+        // Default path if no argument is provided
+        // CHANGE THIS to a PDF that exists on your system for testing
+        "/home/el/Downloads/sample-3.pdf"
+        // Or show a file chooser dialog?
+        // e.g., using fltk::dialog::file_chooser(...)
+    };
+
+    println!("Starting PDF viewer for: {}", pdf_path);
+    create_window(pdf_path); // Call the function that sets up and runs the app
 }
