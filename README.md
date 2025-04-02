@@ -2,6 +2,17 @@
 
 🚀 A super fast, Rust-based PDF reader with Dark Mode support (or at least, that's the goal! 😉)
 
+# Arsenal
+FLTK (UI)
+PDFium-render(backend-renderer)
+lopdf(integrate with PDFium and do parsing, processing etc)
+
+# OK, FLTK, really?
+yeah, why not?
+flkt is super fast, statically linked, and comes bundled(with 1 mb or something in size)
+fltk is like a blank canvas, it doesn't hand you abstaction layers to you, also allows me
+to implement awesomly unneeded custom implementation of something , making stuff complicated!
+just the way I like it *sips tea*
 
 # 🤔 What’s with the name?
 
