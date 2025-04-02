@@ -1,7 +1,3 @@
-Okay, let's inject some personality (and maybe a little existential dread) into this README. Here's a satirical take:
-
----
-
 # 🌙 tsukiyoPDF: Yet Another PDF Reader (This Time in Rust! 🦀)
 
 🚀 **Tagline:** We're aiming for "super fast." Right now, we're settling for "it compiles... sometimes." Dark Mode support? Sure, that's on the wishlist, right after "actually rendering PDFs reliably." 😉
@@ -33,6 +29,7 @@ The name derives from 月夜 (Tsukiyo) - Japanese for "moonlit night" 🌙✨. I
 
 Which is ironic, given the current state of the code resembles more of a frantic, caffeine-fueled coding session during a power outage with only a flickering candle for light. But hey, aspirations!
 
+but not really, more like , I wanted something cool sounding that related to the final destionation this project plans to arrive at(which is, dark mode support, hence the moon thingie in the name)
 ---
 
 ## 💡 Genesis: Why This Digital Masochism?
