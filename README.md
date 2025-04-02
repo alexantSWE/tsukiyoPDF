@@ -28,7 +28,8 @@ I was inspired by the NightPDF project and wanted to try something similar, thou
 My goal is to avoid using Electron or Tauri if possible 💻🚫.
 
 As a complete noob 🍼, I’m starting with the basics and slowly working my way up to more advanced stuff.
-Disclaimer: This project will probably stay in "educational" mode for a long time ⏳.
+
+# Disclaimer: This project will probably stay in "educational" mode for a long time ⏳. #
 
 these are stuff that I'm hoping to able to implement
 # 🛠️ Basic Features
