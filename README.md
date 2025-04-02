@@ -5,7 +5,7 @@
 # Arsenal
 FLTK (UI)
 
-PDFium-render(backend-renderer)
+PDFium-render(backend , renderer)
 
 lopdf(integrate with PDFium and do parsing, processing etc)
 
