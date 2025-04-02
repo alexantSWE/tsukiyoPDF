@@ -12,7 +12,7 @@ lopdf(integrate with PDFium and do parsing, processing etc)
 # OK, FLTK, really?
 yeah, why not?
 flkt is super fast, statically linked, and comes bundled(with 1 mb or something in size)
-fltk is like a blank canvas, it doesn't hand you abstraction layers to you, also allows me
+fltk is like a blank canvas, it doesn't hand you abstraction layers, also allows me
 to implement awesomly unneeded custom implementation of something , making stuff complicated!
 just the way I like it *sips tea*
 
