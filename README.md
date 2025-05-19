@@ -8,6 +8,6 @@ THIS ENTIRE PROJECT IS WRITTEN USING AI TOOLS
 
 this is not a flex or anything and no, I'm not going to pretend anything
 
-what I did is to supervise what those tools and try to guide those tools to a maybe finally functioning program
-which at this stage, it's not
+what I did is to supervise what those tools do and try to guide them tools to a maybe finally functioning program
+which, of course, I haven't been successfull
 it used to run at some point , but then it broke again
